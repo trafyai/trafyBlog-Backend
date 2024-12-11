@@ -2,43 +2,63 @@ import { collection, addDoc, getDocs, query, orderBy, Timestamp, updateDoc, doc,
 import db from '../firebase/firebaseConfig.js';
 import fetch from 'node-fetch'
 import dotenv from 'dotenv';
+import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
+const client = new SecretManagerServiceClient();
+
 dotenv.config();
 
-const mailchimpApiKey = process.env.MAILCHIMP_API_KEY; // Set this in your environment variables
-const mailchimpServerPrefix = process.env.MAILCHIMP_SERVER_PREFIX; // e.g., 'us21'
-const mailchimpAudienceId = process.env.MAILCHIMP_AUDIENCE_ID; 
+async function getSecret(secretName) {
+    const [version] = await client.accessSecretVersion({
+        name: `projects/255821839155/secrets/mailChimp_Api/versions/latest`, // Replace YOUR_PROJECT_ID
+    });
+    return version.payload.data.toString('utf8');
+}
+
+// Fetch secrets during initialization
+let mailchimpApiKey, mailchimpAudienceId, mailchimpServerPrefix;
+
+(async () => {
+    try {
+        mailchimpApiKey = await getSecret('MAILCHIMP_API_KEY');
+        mailchimpAudienceId = await getSecret('MAILCHIMP_AUDIENCE_ID');
+        mailchimpServerPrefix = await getSecret('MAILCHIMP_SERVER_PREFIX');
+        console.log('Secrets loaded successfully');
+    } catch (error) {
+        console.error('Error loading secrets:', error);
+    }
+})();
 
 export const addSubscriber = async (req, res) => {
-  const { email } = req.body;
+    const { email } = req.body;
 
-  if (!email) {
-    return res.status(400).json({ error: "Email is required." });
-  }
-
-  try {
-    const response = await fetch(`https://${mailchimpServerPrefix}.api.mailchimp.com/3.0/lists/${mailchimpAudienceId}/members`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${mailchimpApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email_address: email,
-        status: 'subscribed', // Use 'pending' if you want to send a confirmation email
-      }),
-    });
-
-    if (response.ok) {
-      res.status(200).json({ message: "Successfully subscribed!" });
-    } else {
-      const errorData = await response.json();
-      console.error("Mailchimp Error:", errorData);
-      res.status(500).json({ error: "Failed to subscribe. Please try again." });
+    if (!email) {
+        return res.status(400).json({ error: "Email is required." });
     }
-  } catch (error) {
-    console.error("Error subscribing to Mailchimp:", error);
-    res.status(500).json({ error: "Failed to subscribe. Please try again." });
-  }
+
+    try {
+        const response = await fetch(`https://${mailchimpServerPrefix}.api.mailchimp.com/3.0/lists/${mailchimpAudienceId}/members`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${mailchimpApiKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                email_address: email,
+                status: 'subscribed', // Use 'pending' if you want to send a confirmation email
+            }),
+        });
+
+        if (response.ok) {
+            res.status(200).json({ message: "Successfully subscribed!" });
+        } else {
+            const errorData = await response.json();
+            console.error("Mailchimp Error:", errorData);
+            res.status(500).json({ error: "Failed to subscribe. Please try again." });
+        }
+    } catch (error) {
+        console.error("Error subscribing to Mailchimp:", error);
+        res.status(500).json({ error: "Failed to subscribe. Please try again." });
+    }
 };
 
 
