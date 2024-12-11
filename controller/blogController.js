@@ -29,37 +29,38 @@ let mailchimpApiKey, mailchimpAudienceId, mailchimpServerPrefix;
 })();
 
 export const addSubscriber = async (req, res) => {
-    const { email } = req.body;
+  const { email } = req.body;
 
-    if (!email) {
-        return res.status(400).json({ error: "Email is required." });
-    }
+  if (!email) {
+      return res.status(400).json({ error: "Email is required." });
+  }
 
-    try {
-        const response = await fetch(`https://${mailchimpServerPrefix}.api.mailchimp.com/3.0/lists/${mailchimpAudienceId}/members`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${mailchimpApiKey}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                email_address: email,
-                status: 'subscribed', // Use 'pending' if you want to send a confirmation email
-            }),
-        });
+  try {
+      const response = await fetch(`https://${mailchimpServerPrefix}.api.mailchimp.com/3.0/lists/${mailchimpAudienceId}/members`, {
+          method: 'POST',
+          headers: {
+              'Authorization': `Basic ${Buffer.from(`user:${mailchimpApiKey}`).toString('base64')}`, // Correct format
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+              email_address: email,
+              status: 'subscribed', // Use 'pending' if you want to send a confirmation email
+          }),
+      });
 
-        if (response.ok) {
-            res.status(200).json({ message: "Successfully subscribed!" });
-        } else {
-            const errorData = await response.json();
-            console.error("Mailchimp Error:", errorData);
-            res.status(500).json({ error: "Failed to subscribe. Please try again." });
-        }
-    } catch (error) {
-        console.error("Error subscribing to Mailchimp:", error);
-        res.status(500).json({ error: "Failed to subscribe. Please try again." });
-    }
+      if (response.ok) {
+          res.status(200).json({ message: "Successfully subscribed!" });
+      } else {
+          const errorData = await response.json();
+          console.error("Mailchimp Error:", errorData);
+          res.status(500).json({ error: "Failed to subscribe. Please try again." });
+      }
+  } catch (error) {
+      console.error("Error subscribing to Mailchimp:", error);
+      res.status(500).json({ error: "Failed to subscribe. Please try again." });
+  }
 };
+
 
 
 // Create a new blog
